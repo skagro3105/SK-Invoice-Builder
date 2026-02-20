@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S K Agrochemical - Invoice Generator</title>
+    <link rel="stylesheet" href="style.css?v=3.3">
+    <!-- Include html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <!-- Hidden iframe to trick browsers into saving passwords without reloading the current page -->
+    <iframe name="hidden_iframe" style="display:none;"></iframe>
+    <div id="login-container" class="login-container">
+        <form id="loginForm" class="login-form" target="hidden_iframe" action="#" method="POST">
+            <h2>Welcome Back</h2>
+            <div class="form-group">
+                <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" required>
+            </div>
+            <div class="form-group">
+                <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password"
+                    required>
+            </div>
+            <p id="loginError" class="login-error"
+                style="display: none; color: red; font-size: 14px; margin-top: -10px; margin-bottom: 10px;"></p>
+            <button type="submit" class="download-btn">Log In</button>
+        </form>
+    </div>
+
+    <div class="container" id="app-container" style="display: none;">
+        <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 15px;"
+            class="no-print">
+            <h2 style="margin: 0;">Invoice Builder</h2>
+            <button type="button" id="logoutBtn" class="download-btn no-print"
+                style="background: var(--danger-color, #dc3545);">Logout</button>
+        </div>
+        <!-- Input Form Section -->
+        <div class="input-section no-print">
+            <div class="form-group">
+                <h3>Sender Details</h3>
+                <input type="text" id="senderName" placeholder="Company Name" value="S K Agro chemical">
+                <input type="text" id="senderAddress1" placeholder="Address Line 1"
+                    value="Survey no.207/1, Nr. Balaji Agro, Shapar">
+                <input type="text" id="senderAddress2" placeholder="Address Line 2" value="Rajkot, Gujarat - 360024">
+                <input type="text" id="senderContact" placeholder="Contact Info"
+                    value="9106714212 | skagro3105@gmail.com">
+                <input type="text" id="senderGSTIN" placeholder="GSTIN" value="GSTIN 24AERFS1718Q1ZB">
+                <div class="logo-upload">
+                    <label for="logoUpload">Upload Logo:</label>
+                    <input type="file" id="logoUpload" accept="image/*">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <h3>Receiver Details</h3>
+                <input type="text" id="receiverName" placeholder="Receiver Name">
+                <input type="text" id="receiverDetails" placeholder="Contact Person / Details">
+                <input type="text" id="receiverAddress" placeholder="Address">
+                <input type="text" id="receiverPhone" placeholder="Phone Number">
+            </div>
+
+            <div class="form-group">
+                <h3>Invoice Details</h3>
+                <input type="text" id="invoiceNumber" placeholder="Invoice #">
+                <input type="date" id="invoiceDate">
+            </div>
+
+            <div class="form-group">
+                <h3>Items</h3>
+                <div id="product-status" style="font-size: 12px; color: #666; margin-bottom: 8px;">
+                    <span id="product-status-text">Loading products...</span>
+                </div>
+                <div id="items-container">
+                    <!-- Items will be added here dynamically -->
+                </div>
+                <button type="button" id="addItemBtn">+ Add Item</button>
+            </div>
+
+        </div>
+
+        <!-- Invoice Preview Section -->
+        <div id="invoice-preview" class="invoice-preview">
+            <div class="invoice-header">
+                <div class="company-logo">
+                    <img id="previewLogo" src="Logo.jpg" alt="Logo" class="logo-preview">
+                    <div class="company-details">
+                        <h1 id="previewSenderName" class="editable" contenteditable="true">S K Agrochemical</h1>
+                        <div class="editable company-address" contenteditable="true">
+                            <span id="previewSenderAddress1">Survey no.207/1, Nr balaji Agro, Shapar</span><br>
+                            <span id="previewSenderAddress2">Rajkot, Gujarat - 360024</span><br>
+                            <span id="previewSenderContact">9106714212 | skagro3105@gmail.com</span><br>
+                            <span id="previewSenderGSTIN">GSTIN 24AERFS1718Q1ZB</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="invoice-title editable" contenteditable="true">Invoice</div>
+            </div>
+
+            <div class="invoice-details-row">
+                <div class="receiver-col">
+                    <strong>To,</strong><br>
+                    <div id="previewReceiverBlock" class="editable receiver-block" contenteditable="true">
+                        [Receiver Name]<br>
+                        [Receiver Details]<br>
+                        [Address]<br>
+                        [Phone]
+                    </div>
+                </div>
+                <div class="invoice-meta-col">
+                    <p><strong>Invoice#</strong> <span id="previewInvoiceNumber" class="editable"
+                            contenteditable="true"></span></p>
+                    <p><strong>Date:</strong> <span id="previewInvoiceDate" class="editable"
+                            contenteditable="true"></span></p>
+                </div>
+            </div>
+
+            <div class="invoice-greeting">
+                <p class="editable" contenteditable="true">Dear Sir/Mam,</p>
+                <p class="editable" contenteditable="true">Thank you for your valuable inquiry. We are pleased to quote
+                    as below:</p>
+            </div>
+
+            <table class="invoice-table">
+                <colgroup>
+                    <col class="col-idx">
+                    <col class="col-desc">
+                    <col class="col-qty">
+                    <col class="col-price">
+                    <col class="col-total">
+                    <col class="col-delete">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>DESCRIPTION</th>
+                        <th>QTY</th>
+                        <th>PRICE</th>
+                        <th>TOTAL</th>
+                        <th class="no-print"></th>
+                    </tr>
+                </thead>
+                <tbody id="previewItemsBody">
+                    <!-- Start with one empty row or example row -->
+                </tbody>
+                <tfoot>
+                    <tr class="grand-total-row">
+                        <td colspan="4" class="text-right">GRAND TOTAL</td>
+                        <td id="previewGrandTotal">₹0.00</td>
+                        <td class="no-print"></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div class="table-actions no-print">
+                <button type="button" id="addRowBtn" class="add-row-btn">+ Add Product</button>
+                <button type="button" id="generatePdfBtn" class="download-btn">Download PDF</button>
+            </div>
+
+            <div class="invoice-footer">
+                <p class="editable" contenteditable="true">We hope you find our offer to be in line with your
+                    requirement. <br> <br>
+                    Your goods will be dispatched within 2-3 days after payment is received. <br> <br>
+                    Wednesday and Sunday Company Holiday.
+                </p>
+                <div class="signature-section">
+                    <p class="company-name-footer editable" contenteditable="true">S K AGRO CHEMICAL</p>
+                    <div class="signature-space">
+                        <img src="signature.png" alt="Signature"
+                            style="max-width: 150px; max-height: 80px; display: block; margin: 0 auto;">
+                    </div>
+                    <p class="editable" contenteditable="true">AUTHORIZED SIGNATURE</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=3.7"></script>
+</body>
+
+</html>

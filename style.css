@@ -1,0 +1,1404 @@
+:root {
+    --primary-color: #1f4b99;
+    --accent-color: #f1b500;
+    --text-color: #1d2230;
+    --muted-color: #5b657a;
+    --border-color: #e2e6ef;
+    --bg-color: #f4f6fb;
+    --card-bg: #ffffff;
+    --shadow-sm: 0 8px 24px rgba(24, 39, 75, 0.08);
+    --shadow-lg: 0 18px 48px rgba(24, 39, 75, 0.12);
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: radial-gradient(1200px 600px at 10% 0%, #fff7da 0%, rgba(255, 247, 218, 0) 60%),
+        radial-gradient(900px 520px at 100% 0%, #e3f0ff 0%, rgba(227, 240, 255, 0) 55%),
+        var(--bg-color);
+    margin: 0;
+    padding: 28px;
+    color: var(--text-color);
+    overflow-x: hidden;
+}
+
+.container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    align-items: flex-start;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+/* Input Form Styles */
+.input-section {
+    display: none;
+}
+
+.form-group {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border-color);
+}
+
+.form-group h3 {
+    margin-top: 0;
+    font-size: 1.05em;
+    color: var(--muted-color);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+input[type="text"],
+input[type="date"],
+input[type="number"] {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-sizing: border-box;
+    font-size: 14px;
+    background-color: #fbfcff;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="date"]:focus,
+input[type="number"]:focus {
+    outline: none;
+    border-color: rgba(31, 75, 153, 0.5);
+    box-shadow: 0 0 0 3px rgba(31, 75, 153, 0.15);
+}
+
+button {
+    cursor: pointer;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #1f4b99, #0f2f66);
+    color: white;
+    font-size: 14px;
+    transition: background-color 0.3s;
+    box-shadow: 0 8px 18px rgba(31, 75, 153, 0.18);
+}
+
+button:hover {
+    background: linear-gradient(135deg, #224fa7, #123573);
+}
+
+.download-btn {
+    background: linear-gradient(135deg, #1b9a59, #0f6c3b);
+    width: 100%;
+    font-size: 1.1em;
+    margin-top: 10px;
+}
+
+.download-btn:hover {
+    background: linear-gradient(135deg, #1faa63, #127242);
+}
+
+.item-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.item-row input {
+    margin-bottom: 0;
+}
+
+.remove-btn {
+    background-color: #dc3545;
+    padding: 5px 10px;
+    height: 36px;
+}
+
+.remove-btn:hover {
+    background-color: #c82333;
+}
+
+/* Invoice Preview Styles */
+.invoice-preview {
+    flex: 1.5;
+    min-width: 0;
+    max-width: 100%;
+    /* A4 width approx */
+    background: var(--card-bg);
+    padding: 42px;
+    box-shadow: var(--shadow-lg);
+    border-radius: 18px;
+    border: 1px solid var(--border-color);
+    overflow-x: hidden;
+    /* Aspect ratio for A4 can be maintained or just flexible */
+}
+
+/* Print Specific Styles */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    .invoice-preview,
+    .invoice-preview * {
+        visibility: visible;
+    }
+
+    .invoice-preview {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 10px 20px;
+        box-shadow: none;
+    }
+
+    .no-print {
+        display: none;
+    }
+
+    .col-delete {
+        display: none;
+    }
+
+    .invoice-table tr,
+    .invoice-details-row {
+        page-break-inside: avoid;
+    }
+}
+
+.pdf-mode .no-print {
+    display: none !important;
+}
+
+.pdf-mode {
+    padding: 2px 20px 10px 20px !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+}
+
+.pdf-mode>*:first-child {
+    margin-top: 0 !important;
+}
+
+.pdf-mode .invoice-header {
+    position: relative !important;
+    display: block !important;
+    margin-top: 0 !important;
+    margin-bottom: 25px !important;
+}
+
+.pdf-mode .company-logo {
+    display: block !important;
+    text-align: center !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 20px !important;
+}
+
+.pdf-mode .company-details {
+    display: inline-block !important;
+    text-align: center !important;
+    margin: 0 auto !important;
+    padding: 22px 160px 0 !important;
+    /* Prevents overlap with absolute elements */
+}
+
+.pdf-mode .invoice-title {
+    position: absolute !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin: 0 !important;
+}
+
+/* Force desktop table layout in PDF mode regardless of screen size */
+.pdf-mode .invoice-table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    font-size: 14px !important;
+}
+
+.pdf-mode .invoice-table thead {
+    display: table-header-group !important;
+}
+
+.pdf-mode .invoice-table tbody {
+    display: table-row-group !important;
+}
+
+.pdf-mode .invoice-table tfoot {
+    display: table-footer-group !important;
+}
+
+.pdf-mode .invoice-table tr {
+    display: table-row !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+}
+
+.pdf-mode .invoice-table td {
+    display: table-cell !important;
+    position: static !important;
+    padding: 10px 8px !important;
+    border-bottom: 1px solid #edf0f7 !important;
+    vertical-align: middle !important;
+    text-align: left !important;
+    background: transparent !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+}
+
+.pdf-mode .invoice-table td::before {
+    display: none !important;
+}
+
+.pdf-mode .invoice-table th {
+    display: table-cell !important;
+    background-color: #f1f4fb !important;
+    border-top: 2px solid #e2e6ef !important;
+    border-bottom: 2px solid #e2e6ef !important;
+    text-align: left !important;
+    padding: 8px !important;
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+}
+
+.pdf-mode .invoice-table td:nth-child(1),
+.pdf-mode .invoice-table th:nth-child(1) {
+    text-align: center !important;
+    width: 6% !important;
+}
+
+.pdf-mode .invoice-table td:nth-child(3),
+.pdf-mode .invoice-table th:nth-child(3) {
+    text-align: center !important;
+    width: 14% !important;
+}
+
+/* Fix TOTAL column alignment */
+.pdf-mode .invoice-table th:nth-child(5),
+.pdf-mode .invoice-table td:nth-child(5) {
+    text-align: right !important;
+    width: 16% !important;
+}
+
+.pdf-mode .invoice-table td.item-total {
+    text-align: right !important;
+    padding-right: 12px !important;
+}
+
+.pdf-mode .invoice-table tfoot tr {
+    display: table-row !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+}
+
+
+.pdf-mode .invoice-table tfoot td {
+    border-top: 2px solid #e2e6ef !important;
+    border-bottom: none !important;
+    padding: 10px 8px !important;
+    font-weight: bold !important;
+    background-color: #f8f9fd !important;
+    color: #1f4b99 !important;
+}
+
+.pdf-mode .invoice-table tfoot td:first-child {
+    text-align: right !important;
+    padding-right: 15px !important;
+}
+
+.pdf-mode .delete-row-btn {
+    display: none !important;
+}
+
+.pdf-mode .logo-preview {
+    position: absolute !important;
+    left: 0 !important;
+    top: 25px !important;
+    width: 125px !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+}
+
+.pdf-mode .invoice-details-row {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    margin-top: 15px !important;
+    gap: 0 !important;
+}
+
+.pdf-mode .invoice-meta-col {
+    text-align: right !important;
+}
+
+.pdf-mode .invoice-footer {
+    margin-top: 15px !important;
+    gap: 12px !important;
+}
+
+.pdf-mode .table-actions {
+    display: none !important;
+    margin: 0 !important;
+    height: 0 !important;
+}
+
+.pdf-mode .signature-section {
+    margin-top: 20px !important;
+}
+
+.pdf-mode .signature-space {
+    height: 30px !important;
+}
+
+.pdf-mode .invoice-table {
+    margin-bottom: 0 !important;
+}
+
+.pdf-mode .col-delete,
+.pdf-mode .delete-col,
+.pdf-mode .delete-row-btn {
+    display: none !important;
+}
+
+/* Invoice Template Styling based on Reference */
+.invoice-header {
+    text-align: left;
+    margin-bottom: 15px;
+    position: relative;
+}
+
+.company-logo {
+    display: grid;
+    grid-template-columns: 200px 1fr 160px;
+    align-items: center;
+    gap: 12px;
+}
+
+.company-details {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+}
+
+.company-logo h1 {
+    font-size: 24px;
+    color: #66CC00;
+    /* Approximate green from logo/text if it was colored, or standard black/blue */
+    color: #000;
+    margin: 0;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+/* Specifically target "S K Agrochemical" to be bold blue/navy as per image header */
+.company-logo h1 {
+    font-size: 24px;
+    color: #0f2f66;
+    /* Dark Blue */
+    margin-top: 5px;
+    font-family: 'Fraunces', serif;
+    letter-spacing: 0.02em;
+}
+
+.logo-preview {
+    max-width: 190px;
+    max-height: 110px;
+    margin-bottom: 0;
+    display: block;
+    object-fit: contain;
+    justify-self: start;
+}
+
+
+.company-logo p {
+    margin: 2px 0;
+    font-size: 14px;
+    color: var(--muted-color);
+}
+
+.company-address {
+    margin: 2px auto 0;
+    font-size: 14px;
+    color: var(--muted-color);
+    line-height: 1.4;
+    max-width: 520px;
+    word-break: break-word;
+}
+
+.invoice-title {
+    position: static;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f2f66;
+    background: #eef4ff;
+    border: 1px solid #d7e3ff;
+    padding: 6px 12px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    justify-self: end;
+}
+
+.invoice-details-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    border-top: 2px solid var(--border-color);
+    padding-top: 10px;
+}
+
+.table-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.table-actions .download-btn,
+.table-actions .add-row-btn {
+    width: auto;
+    padding: 10px 18px;
+}
+
+.add-row-btn {
+    background: #ffffff;
+    color: #0f2f66;
+    border: 1px solid #d7e3ff;
+    box-shadow: none;
+}
+
+.add-row-btn:hover {
+    background: #eef4ff;
+}
+
+.delete-row-btn {
+    background: #fee;
+    color: #c82333;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    font-size: 20px;
+    line-height: 1;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: bold;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.delete-row-btn:hover {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+.delete-col {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.item-total {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.receiver-col {
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--muted-color);
+}
+
+.receiver-block {
+    display: inline-block;
+    max-width: 320px;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.invoice-meta-col {
+    text-align: right;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--muted-color);
+}
+
+.invoice-greeting {
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--muted-color);
+}
+
+.invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 14px;
+    table-layout: fixed;
+}
+
+.invoice-table .col-idx {
+    width: 6%;
+}
+
+.invoice-table .col-desc {
+    width: 40%;
+}
+
+.invoice-table .col-qty {
+    width: 14%;
+}
+
+.invoice-table .col-price {
+    width: 16%;
+}
+
+.invoice-table .col-total {
+    width: 16%;
+}
+
+.invoice-table .col-delete {
+    width: 8%;
+}
+
+.invoice-table td:nth-child(1),
+.invoice-table th:nth-child(1) {
+    text-align: center;
+}
+
+.invoice-table td:nth-child(3),
+.invoice-table th:nth-child(3) {
+    text-align: center;
+}
+
+.invoice-table th {
+    background-color: #f1f4fb;
+    /* Light grey header */
+    border-top: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--border-color);
+    text-align: left;
+    padding: 8px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #243150;
+    letter-spacing: 0.03em;
+}
+
+.invoice-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #edf0f7;
+    vertical-align: middle;
+    height: 50px;
+}
+
+.invoice-table th,
+.invoice-table td {
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.invoice-table td:nth-child(2),
+.invoice-table th:nth-child(2) {
+    white-space: normal;
+    overflow: visible;
+}
+
+.table-input {
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 14px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: transparent;
+    color: var(--text-color);
+    transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+    line-height: 1.4;
+    box-sizing: border-box;
+    display: block;
+}
+
+.table-input:focus {
+    outline: none;
+    border-color: rgba(31, 75, 153, 0.4);
+    box-shadow: 0 0 0 2px rgba(31, 75, 153, 0.12);
+    background-color: rgba(31, 75, 153, 0.04);
+}
+
+.pdf-mode .table-input {
+    border-color: transparent;
+    box-shadow: none;
+    background: transparent;
+    padding: 0;
+    height: auto;
+}
+
+.table-input-details {
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+}
+
+.pdf-mode .table-input-details {
+    display: block;
+    margin-top: 4px;
+    color: #444;
+}
+
+.pdf-mode .cell-stack {
+    gap: 2px;
+}
+
+.pdf-text {
+    display: inline-block;
+    font-size: 14px;
+    color: var(--text-color);
+}
+
+.cell-stack {
+    display: block;
+    width: 100%;
+}
+
+.invoice-table td:nth-child(3) .table-input {
+    text-align: center;
+    margin: 0 auto;
+}
+
+.cell-stack small {
+    display: inline-block;
+    color: var(--muted-color);
+}
+
+.table-input.small {
+    width: 100%;
+}
+
+.table-input.tiny {
+    width: 100%;
+}
+
+.autocomplete-menu {
+    position: absolute;
+    z-index: 20;
+    min-width: 220px;
+    max-width: 360px;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 12px 28px rgba(24, 39, 75, 0.18);
+    padding: 6px;
+    display: none;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.autocomplete-item {
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    color: var(--text-color);
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.is-active {
+    background: rgba(31, 75, 153, 0.08);
+    color: #0f2f66;
+}
+
+.autocomplete-empty {
+    padding: 10px 12px;
+    color: #8a93a8;
+    font-size: 13px;
+}
+
+.invoice-table th:last-child,
+.invoice-table td:last-child {
+    text-align: right;
+}
+
+.invoice-table th:nth-child(3),
+.invoice-table td:nth-child(3) {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+    font-weight: bold;
+}
+
+.invoice-table tfoot td {
+    border-top: 2px solid var(--border-color);
+    /* Thicker line for total */
+    padding-top: 10px;
+    font-weight: bold;
+    background-color: #f8f9fd;
+}
+
+.invoice-footer {
+    margin-top: 20px;
+    font-size: 16px;
+    color: var(--muted-color);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    font-family: 'Fraunces', serif;
+    color: #0f2f66;
+}
+
+.signature-section {
+    margin-top: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    gap: 6px;
+}
+
+.company-name-footer {
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #0f2f66;
+}
+
+.signature-space {
+    height: 40px;
+    width: 200px;
+    /* border-bottom: 1px solid var(--border-color); */
+}
+
+.logo-upload {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    color: var(--muted-color);
+    font-size: 14px;
+}
+
+@media (max-width: 980px) {
+    .invoice-preview {
+        min-width: 0;
+    }
+
+    .company-logo {
+        grid-template-columns: 1fr;
+        justify-items: center;
+    }
+
+    .invoice-title {
+        margin-top: 10px;
+        justify-self: center;
+    }
+}
+
+.editable {
+    outline: none;
+    border-radius: 6px;
+    padding: 2px 10px;
+    transition: box-shadow 0.2s, background-color 0.2s;
+}
+
+.editable:focus {
+    background-color: rgba(31, 75, 153, 0.08);
+    box-shadow: 0 0 0 2px rgba(31, 75, 153, 0.18);
+}
+
+.editable:empty::before {
+    content: "Click to edit";
+    color: #9aa4b8;
+}
+
+@media (max-width: 820px) {
+    body {
+        padding: 18px;
+    }
+
+    .container {
+        flex-direction: column;
+    }
+
+    .invoice-table tr,
+    .invoice-details-row,
+    .invoice-footer {
+        page-break-inside: avoid;
+    }
+
+    .invoice-preview {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .invoice-preview {
+        padding: 28px;
+    }
+
+    .invoice-details-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .invoice-meta-col {
+        text-align: left;
+    }
+
+    .invoice-table th,
+    .invoice-table td {
+        padding: 8px;
+    }
+
+    .invoice-table td:nth-child(2) {
+        word-break: break-word;
+    }
+
+    .table-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .table-actions .download-btn,
+    .table-actions .add-row-btn {
+        width: 100%;
+        text-align: center;
+        padding: 12px 16px;
+        font-size: 15px;
+    }
+
+    .table-input {
+        padding: 8px 10px;
+        font-size: 14px;
+    }
+
+    .table-input.small,
+    .table-input.tiny {
+        max-width: 100%;
+    }
+
+    .delete-row-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 520px) {
+    body {
+        padding: 8px;
+    }
+
+    .input-section,
+    .invoice-preview {
+        padding: 16px;
+        border-radius: 14px;
+    }
+
+    .company-logo {
+        gap: 8px;
+    }
+
+    .logo-preview {
+        max-width: 150px;
+        max-height: 84px;
+    }
+
+    .company-logo h1 {
+        font-size: 20px;
+    }
+
+    .company-logo p {
+        font-size: 13px;
+    }
+
+    /* Mobile-Friendly Card Layout for Table */
+    .invoice-table {
+        font-size: 14px;
+        display: block;
+        width: 100%;
+        border: none;
+    }
+
+    .invoice-table thead {
+        display: none;
+        /* Hide table headers on mobile */
+    }
+
+    .invoice-table tbody {
+        display: block;
+    }
+
+    .invoice-table tbody tr {
+        display: block;
+        background: #f8f9fc;
+        border: 1px solid #e2e6ef;
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 12px;
+        position: relative;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .invoice-table tbody tr:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .invoice-table td {
+        display: block;
+        padding: 8px 0;
+        border: none;
+        text-align: left !important;
+        height: auto;
+        white-space: normal;
+        overflow: visible;
+    }
+
+    /* Row number badge */
+    .invoice-table tbody td:nth-child(1) {
+        position: absolute;
+        top: 14px;
+        right: 50px;
+        width: auto;
+        background: #1f4b99;
+        color: white;
+        border-radius: 8px;
+        padding: 4px 10px !important;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .invoice-table tbody td:nth-child(1)::before {
+        content: "#";
+        margin-right: 2px;
+    }
+
+    /* Delete button */
+    .invoice-table tbody td:nth-child(6) {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: auto;
+        padding: 0 !important;
+    }
+
+    /* Description field */
+    .invoice-table tbody td:nth-child(2) {
+        padding-top: 0 !important;
+        margin-bottom: 8px;
+    }
+
+    .invoice-table tbody td:nth-child(2)::before {
+        content: "Product Description";
+        display: block;
+        font-weight: 700;
+        font-size: 10px;
+        text-transform: uppercase;
+        color: #5b657a;
+        margin-bottom: 6px;
+        letter-spacing: 0.8px;
+    }
+
+    .invoice-table tbody td:nth-child(2) .table-input {
+        font-size: 15px;
+        padding: 12px 14px;
+        border: 1px solid #d1d9e6;
+        background: white;
+        border-radius: 10px;
+        min-height: 46px;
+        font-weight: 500;
+    }
+
+    /* Quantity, Price, Total in a flex row */
+    .invoice-table tbody td:nth-child(3),
+    .invoice-table tbody td:nth-child(4),
+    .invoice-table tbody td:nth-child(5) {
+        display: inline-block;
+        width: calc(33.33% - 4px);
+        margin-right: 6px;
+        vertical-align: top;
+    }
+
+    .invoice-table tbody td:nth-child(5) {
+        margin-right: 0;
+    }
+
+    .invoice-table tbody td:nth-child(3)::before,
+    .invoice-table tbody td:nth-child(4)::before,
+    .invoice-table tbody td:nth-child(5)::before {
+        content: attr(data-label);
+        display: block;
+        font-weight: 700;
+        font-size: 10px;
+        text-transform: uppercase;
+        color: #5b657a;
+        margin-bottom: 5px;
+        letter-spacing: 0.8px;
+    }
+
+    .invoice-table tbody td:nth-child(3) .table-input,
+    .invoice-table tbody td:nth-child(4) .table-input {
+        font-size: 15px;
+        padding: 12px 10px;
+        border: 1px solid #d1d9e6;
+        background: white;
+        border-radius: 10px;
+        text-align: center;
+        min-height: 46px;
+        font-weight: 500;
+    }
+
+    /* Total field (read-only) */
+    .invoice-table tbody td:nth-child(5) {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1f4b99;
+        padding-top: 25px !important;
+        text-align: right !important;
+    }
+
+    .delete-row-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        background: #ef4444;
+        color: white;
+        box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
+    }
+
+    .delete-row-btn:hover {
+        background: #dc2626;
+    }
+
+    /* Footer styling - Grand Total Box */
+    .invoice-table tfoot {
+        display: block;
+        margin-top: 12px;
+    }
+
+    .invoice-table tfoot tr {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #1f4b99 0%, #2558b8 100%);
+        color: white;
+        padding: 18px 20px;
+        border-radius: 14px;
+        box-shadow: 0 4px 12px rgba(31, 75, 153, 0.25);
+    }
+
+    .invoice-table tfoot td {
+        border: none !important;
+        padding: 0 !important;
+        background: transparent !important;
+        white-space: normal !important;
+    }
+
+    .invoice-table tfoot td::before {
+        display: none !important;
+    }
+
+    .invoice-table tfoot td:first-child {
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+
+    .invoice-table tfoot td:last-child {
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    #previewGrandTotal {
+        font-size: 20px !important;
+        padding: 0 !important;
+    }
+
+    /* Table inputs improvements */
+    .table-input {
+        min-width: 0;
+        font-size: 14px;
+        padding: 10px 12px;
+        box-sizing: border-box;
+    }
+
+    .table-input:focus {
+        border-color: #1f4b99 !important;
+        box-shadow: 0 0 0 3px rgba(31, 75, 153, 0.1);
+    }
+
+    .table-input.small,
+    .table-input.tiny {
+        max-width: 100%;
+    }
+
+    .item-total {
+        padding: 6px 0 !important;
+    }
+
+    /* Action buttons */
+    .table-actions {
+        margin-top: 16px;
+    }
+
+    .table-actions .download-btn,
+    .table-actions .add-row-btn {
+        padding: 14px 20px;
+        font-size: 15px;
+        border-radius: 12px;
+    }
+
+    /* Mobile-optimized autocomplete */
+    .autocomplete-menu {
+        max-width: calc(100vw - 32px);
+        min-width: 280px;
+        max-height: 280px;
+        border-radius: 14px;
+        padding: 8px;
+    }
+
+    .autocomplete-item {
+        padding: 14px 12px;
+        font-size: 15px;
+        border-radius: 10px;
+        margin-bottom: 2px;
+    }
+
+    .autocomplete-item:active {
+        background: rgba(31, 75, 153, 0.15);
+    }
+
+    .autocomplete-empty {
+        padding: 14px 12px;
+        font-size: 14px;
+    }
+
+    /* Keep desktop-style table layout in PDFs on mobile */
+    .pdf-mode .invoice-table {
+        display: table !important;
+        width: 100% !important;
+        table-layout: fixed !important;
+        font-size: 14px !important;
+    }
+
+    .pdf-mode .invoice-table thead,
+    .pdf-mode .invoice-table tbody,
+    .pdf-mode .invoice-table tfoot {
+        display: table-row-group !important;
+    }
+
+    .pdf-mode .invoice-table thead {
+        display: table-header-group !important;
+    }
+
+    .pdf-mode .invoice-table tfoot {
+        display: table-footer-group !important;
+    }
+
+    .pdf-mode .invoice-table tr {
+        display: table-row !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .pdf-mode .invoice-table td,
+    .pdf-mode .invoice-table th {
+        display: table-cell !important;
+        position: static !important;
+        padding: 10px 8px !important;
+        border-bottom: 1px solid #edf0f7 !important;
+        vertical-align: middle !important;
+        text-align: left !important;
+        background: transparent !important;
+        width: auto !important;
+        height: auto !important;
+        margin: 0 !important;
+    }
+
+    .pdf-mode .invoice-table td::before {
+        display: none !important;
+    }
+}
+
+/* Final PDF overrides (must come after mobile rules) */
+.pdf-mode .invoice-table {
+    display: table !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+    font-size: 14px !important;
+}
+
+.pdf-mode .invoice-table thead {
+    display: table-header-group !important;
+}
+
+.pdf-mode .invoice-table tbody {
+    display: table-row-group !important;
+}
+
+.pdf-mode .invoice-table tfoot {
+    display: table-footer-group !important;
+}
+
+.pdf-mode .invoice-table tr {
+    display: table-row !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+}
+
+.pdf-mode .invoice-table th,
+.pdf-mode .invoice-table td {
+    display: table-cell !important;
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 10px 8px !important;
+    border-bottom: 1px solid #edf0f7 !important;
+    vertical-align: middle !important;
+    text-align: left !important;
+    background: transparent !important;
+    margin: 0 !important;
+    white-space: normal !important;
+}
+
+.pdf-mode .invoice-table td::before {
+    display: none !important;
+}
+
+.pdf-mode .invoice-table tfoot tr {
+    display: table-row !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+}
+
+.pdf-mode .invoice-table tfoot td {
+    border-top: 2px solid #e2e6ef !important;
+    border-bottom: none !important;
+    background-color: #f8f9fd !important;
+}
+
+.pdf-mode .delete-row-btn,
+.pdf-mode .col-delete {
+    display: none !important;
+}
+
+/* Neutralize mobile card-specific rules in PDF mode */
+.pdf-mode .invoice-table tbody td:nth-child(1),
+.pdf-mode .invoice-table tbody td:nth-child(6) {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+    background: transparent !important;
+    color: inherit !important;
+    border-radius: 0 !important;
+}
+
+.pdf-mode .invoice-table tbody td:nth-child(3),
+.pdf-mode .invoice-table tbody td:nth-child(4),
+.pdf-mode .invoice-table tbody td:nth-child(5) {
+    display: table-cell !important;
+    width: auto !important;
+    margin: 0 !important;
+    vertical-align: middle !important;
+}
+
+.pdf-mode .invoice-table tbody td:nth-child(2),
+.pdf-mode .invoice-table tbody td:nth-child(3),
+.pdf-mode .invoice-table tbody td:nth-child(4),
+.pdf-mode .invoice-table tbody td:nth-child(5) {
+    padding: 10px 8px !important;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+/* Login System Styles */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: var(--bg-color);
+}
+
+.login-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.login-form h2 {
+    color: var(--primary-color);
+    margin-bottom: 20px;
+}
+
+.login-form .form-group {
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.login-form input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.login-form input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.login-form .download-btn {
+    width: 100%;
+    margin-top: 10px;
+}
