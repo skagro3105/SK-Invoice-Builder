@@ -166,10 +166,7 @@ button:hover {
         display: none;
     }
 
-    .invoice-table tr,
-    .invoice-details-row {
-        page-break-inside: avoid;
-    }
+    /* keep natural flow for printing; avoid forcing page breaks */
 }
 
 .pdf-mode .no-print {
@@ -248,7 +245,7 @@ button:hover {
     padding: 0 !important;
     margin: 0 !important;
     box-shadow: none !important;
-    page-break-inside: avoid !important;
+    /* no forced page break here to allow natural flow */
 }
 
 .pdf-mode .invoice-table td {
@@ -291,16 +288,64 @@ button:hover {
     width: 14% !important;
 }
 
-/* Fix TOTAL column alignment */
+/* Center PRICE column (both heading and values) to match preview and PDF */
+.invoice-table th:nth-child(5),
+.invoice-table td:nth-child(5) {
+    text-align: center;
+}
+
 .pdf-mode .invoice-table th:nth-child(5),
 .pdf-mode .invoice-table td:nth-child(5) {
-    text-align: right !important;
+    text-align: center !important;
     width: 16% !important;
 }
 
+/* Ensure input/span content in PRICE column is centered and fills the cell */
+.invoice-table td:nth-child(5) .table-input,
+.invoice-table td:nth-child(5) span,
+.invoice-table td:nth-child(5) .pdf-cell-product {
+    display: block;
+    text-align: center;
+    margin: 0 auto;
+}
+.pdf-mode .invoice-table td:nth-child(5) span,
+.pdf-mode .invoice-table td:nth-child(5) .pdf-cell-product {
+    text-align: center !important;
+    display: block !important;
+}
+
+/* PDF-only: ensure TOTAL column (6th) values are precisely centered */
+.pdf-mode .invoice-table th:nth-child(6),
+.pdf-mode .invoice-table td:nth-child(6) {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+.pdf-mode .invoice-table td:nth-child(6) .table-input,
+.pdf-mode .invoice-table td:nth-child(6) span {
+    display: block !important;
+    text-align: center !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+}
+/* Grand total in tfoot may sit in a different cell; target its id to center in PDF */
+.pdf-mode #previewGrandTotal {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
 .pdf-mode .invoice-table td.item-total {
-    text-align: right !important;
-    padding-right: 12px !important;
+    text-align: center !important;
+    padding-right: 0 !important;
+}
+
+/* Center TOTAL column (heading and cell values) in PDF */
+.invoice-table th:nth-child(6),
+.invoice-table td:nth-child(6) {
+    text-align: center;
+}
+.pdf-mode .invoice-table th:nth-child(6),
+.pdf-mode .invoice-table td:nth-child(6) {
+    text-align: center !important;
 }
 
 .pdf-mode .invoice-table tfoot tr {
@@ -323,6 +368,19 @@ button:hover {
 .pdf-mode .invoice-table tfoot td:first-child {
     text-align: right !important;
     padding-right: 15px !important;
+}
+
+/* Ensure footer amount cell is centered in PDF (matches PRICE column centering) */
+.pdf-mode .invoice-table tfoot td:nth-child(6),
+.pdf-mode .invoice-table tfoot td:last-child {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+/* PDF: center the footer amount cell so the amount appears under the TOTAL heading */
+.pdf-mode .invoice-table tfoot td:nth-child(5) {
+    text-align: center !important;
+    vertical-align: middle !important;
 }
 
 .pdf-mode .delete-row-btn {
@@ -349,6 +407,14 @@ button:hover {
 
 .pdf-mode .invoice-meta-col {
     text-align: right !important;
+}
+
+/* PDF-only: widen the bank details box so it appears larger in the generated PDF */
+.pdf-mode .bank-details-box {
+    /* Fill available space beside QR box in the PDF (responsive) */
+    max-width: calc(80% - 160px) !important;
+    width: auto !important;
+    flex: 1 1 auto !important;
 }
 
 .pdf-mode .invoice-footer {
@@ -572,6 +638,10 @@ button:hover {
     width: 14%;
 }
 
+.invoice-table .col-brand {
+    width: 14%;
+}
+
 .invoice-table .col-price {
     width: 16%;
 }
@@ -611,7 +681,6 @@ button:hover {
     padding: 10px 8px;
     border-bottom: 1px solid #edf0f7;
     vertical-align: middle;
-    height: 50px;
 }
 
 .invoice-table th,
@@ -716,6 +785,8 @@ button:hover {
     display: none;
     max-height: 240px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
 }
 
 .autocomplete-item {
@@ -725,6 +796,10 @@ button:hover {
     cursor: pointer;
     color: var(--text-color);
     transition: background-color 0.15s, color 0.15s;
+
+    /* improve touch behavior */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .autocomplete-item:hover,
@@ -773,6 +848,30 @@ button:hover {
     color: #0f2f66;
 }
 
+.company-details-box,
+.bank-details-box {
+    background: #fff;
+    box-shadow: var(--shadow-sm);
+}
+
+#qrContainer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    width: 140px;
+    background: #fff;
+}
+
+/* Ensure QR images have consistent sizing in preview and PDF */
+#qrContainer img, #qrContainer canvas {
+    width: 140px;
+    height: auto;
+    display: block;
+}
+
+/* Keep natural flow for company/bank/QR section (no forced page breaks) */
+
 .signature-section {
     margin-top: 40px;
     display: flex;
@@ -780,6 +879,36 @@ button:hover {
     align-items: flex-end;
     text-align: right;
     gap: 6px;
+}
+
+/* When bank details are inside the footer, make them sit beside the signature */
+.invoice-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.invoice-footer .company-bank-row {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+/* In PDF/print, keep bank and QR side-by-side to match preview */
+.pdf-mode .company-bank-row {
+    flex-direction: row !important;
+    gap: 10px !important;
+}
+
+.invoice-footer .bank-details-box {
+    flex: 0 0 45%;
+    max-width: 45%;
+}
+
+.invoice-footer .signature-section {
+    flex: 0 0 45%;
 }
 
 .company-name-footer {
@@ -836,6 +965,19 @@ button:hover {
     color: #9aa4b8;
 }
 
+/* Do not show the placeholder in PDF output */
+.pdf-mode .editable:empty::before {
+    content: none !important;
+}
+
+/* Only show 'Click to edit' placeholder on screen media */
+@media screen {
+    .editable:empty::before {
+        content: "Click to edit";
+        color: #9aa4b8;
+    }
+}
+
 @media (max-width: 820px) {
     body {
         padding: 18px;
@@ -845,11 +987,7 @@ button:hover {
         flex-direction: column;
     }
 
-    .invoice-table tr,
-    .invoice-details-row,
-    .invoice-footer {
-        page-break-inside: avoid;
-    }
+    /* natural flow on small screens */
 
     .invoice-preview {
         width: 100%;
@@ -862,6 +1000,11 @@ button:hover {
     }
 
     .invoice-details-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .invoice-footer .company-bank-row {
         flex-direction: column;
         gap: 12px;
     }
@@ -999,8 +1142,8 @@ button:hover {
         margin-right: 2px;
     }
 
-    /* Delete button */
-    .invoice-table tbody td:nth-child(6) {
+    /* Delete button (now column 7 on mobile because Brand column added) */
+    .invoice-table tbody td:nth-child(7) {
         position: absolute;
         top: 12px;
         right: 12px;
@@ -1008,14 +1151,14 @@ button:hover {
         padding: 0 !important;
     }
 
-    /* Description field */
+    /* Brand field (new) */
     .invoice-table tbody td:nth-child(2) {
         padding-top: 0 !important;
         margin-bottom: 8px;
     }
 
     .invoice-table tbody td:nth-child(2)::before {
-        content: "Product Description";
+        content: "Brand";
         display: block;
         font-weight: 700;
         font-size: 10px;
@@ -1035,23 +1178,50 @@ button:hover {
         font-weight: 500;
     }
 
-    /* Quantity, Price, Total in a flex row */
-    .invoice-table tbody td:nth-child(3),
+    /* Description field (now column 3) */
+    .invoice-table tbody td:nth-child(3) {
+        padding-top: 0 !important;
+        margin-bottom: 8px;
+    }
+
+    .invoice-table tbody td:nth-child(3)::before {
+        content: "Product";
+        display: block;
+        font-weight: 700;
+        font-size: 10px;
+        text-transform: uppercase;
+        color: #5b657a;
+        margin-bottom: 6px;
+        letter-spacing: 0.8px;
+    }
+
+    .invoice-table tbody td:nth-child(3) .table-input {
+        font-size: 15px;
+        padding: 12px 14px;
+        border: 1px solid #d1d9e6;
+        background: white;
+        border-radius: 10px;
+        min-height: 46px;
+        font-weight: 500;
+    }
+
+    /* Quantity, Price, Total in a flex row (now columns 4,5,6) */
     .invoice-table tbody td:nth-child(4),
-    .invoice-table tbody td:nth-child(5) {
+    .invoice-table tbody td:nth-child(5),
+    .invoice-table tbody td:nth-child(6) {
         display: inline-block;
         width: calc(33.33% - 4px);
         margin-right: 6px;
         vertical-align: top;
     }
 
-    .invoice-table tbody td:nth-child(5) {
+    .invoice-table tbody td:nth-child(6) {
         margin-right: 0;
     }
 
-    .invoice-table tbody td:nth-child(3)::before,
     .invoice-table tbody td:nth-child(4)::before,
-    .invoice-table tbody td:nth-child(5)::before {
+    .invoice-table tbody td:nth-child(5)::before,
+    .invoice-table tbody td:nth-child(6)::before {
         content: attr(data-label);
         display: block;
         font-weight: 700;
@@ -1062,8 +1232,8 @@ button:hover {
         letter-spacing: 0.8px;
     }
 
-    .invoice-table tbody td:nth-child(3) .table-input,
-    .invoice-table tbody td:nth-child(4) .table-input {
+    .invoice-table tbody td:nth-child(4) .table-input,
+    .invoice-table tbody td:nth-child(5) .table-input {
         font-size: 15px;
         padding: 12px 10px;
         border: 1px solid #d1d9e6;
@@ -1074,13 +1244,13 @@ button:hover {
         font-weight: 500;
     }
 
-    /* Total field (read-only) */
-    .invoice-table tbody td:nth-child(5) {
+    /* Total field (read-only) now column 6 */
+    .invoice-table tbody td:nth-child(6) {
         font-size: 16px;
         font-weight: 700;
         color: #1f4b99;
-        padding-top: 25px !important;
-        text-align: right !important;
+        padding-top: 12px !important;
+        text-align: center !important;
     }
 
     .delete-row-btn {
@@ -1166,7 +1336,16 @@ button:hover {
 
     .item-total {
         padding: 6px 0 !important;
+        text-align: center !important;
     }
+
+/* Ensure any spans inside the TOTAL column are block and centered like PRICE */
+.invoice-table tbody td:nth-child(6) span,
+.invoice-table tbody td:nth-child(6) .table-input {
+    display: block !important;
+    text-align: center !important;
+    margin: 0 auto !important;
+}
 
     /* Action buttons */
     .table-actions {
@@ -1401,4 +1580,86 @@ button:hover {
 .login-form .download-btn {
     width: 100%;
     margin-top: 10px;
+}
+
+/* ========================= */
+/* PDF MODE TABLE STYLING   */
+/* ========================= */
+
+.pdf-mode .invoice-table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+}
+
+.pdf-mode .invoice-table th,
+.pdf-mode .invoice-table td {
+    border: 1px solid #000 !important;
+    padding: 8px 10px !important;
+}
+
+.pdf-mode .invoice-table thead th {
+    background: #f3f4f6 !important;
+    font-weight: 600 !important;
+}
+
+/* ===== FIX GST + GRAND TOTAL SIZE ===== */
+
+.summary-section,
+.totals-container {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;               /* Proper spacing between boxes */
+}
+
+/* Individual blue boxes */
+.summary-section > div,
+.totals-container > div {
+    background: #2f5aa8;
+    border-radius: 18px;     /* Smaller curve */
+    padding: 22px 26px;      /* Reduced padding */
+    box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+}
+
+/* Title text (GST / GRAND TOTAL) */
+.summary-section h3,
+.totals-container h3 {
+    font-size: 20px;
+    margin-bottom: 12px;
+}
+
+/* Amount text */
+.summary-section .amount,
+.totals-container .amount {
+    font-size: 30px;         /* Reduced from huge */
+    font-weight: 600;
+}
+
+/* Small-screen tweaks: reduce box size and increase spacing for mobile clarity */
+@media (max-width: 480px) {
+    .summary-section > div,
+    .totals-container > div {
+        padding: 12px 14px !important;
+        border-radius: 12px !important;
+    }
+
+    .summary-section h3,
+    .totals-container h3 {
+        font-size: 16px !important;
+        margin-bottom: 8px !important;
+    }
+
+    .summary-section .amount,
+    .totals-container .amount {
+        font-size: 20px !important;
+    }
+
+    /* Footer table cards (preview only) - reduce height and add gap between cards */
+    .invoice-preview:not(.pdf-mode) .invoice-table tfoot tr {
+        padding: 10px 12px !important;
+        border-radius: 10px !important;
+        margin-bottom: 10px !important;
+    }
+
+    .invoice-preview:not(.pdf-mode) .invoice-table tfoot tr.gst-row { margin-bottom: 12px !important; }
+    .invoice-preview:not(.pdf-mode) .invoice-table tfoot tr.grand-total-row { margin-top: 6px !important; }
 }
