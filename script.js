@@ -21,14 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentUser = null;
 
-    // State management for items
+    // State management for items (includes brand)
     let items = [
-        { id: 1, description: '', itemDetails: '', quantity: 1, price: 0.00 }
+        { id: 1, brand: '', description: '', itemDetails: '', quantity: 1, price: 0.00 }
     ];
     // Paste your Google Sheets CSV URL here:
     const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR_VwyESB419ROlLkNZmuQ18cyLit9leySgP6VpetMr509IjARdSEBw1uFGNGIseaLTdbbe4iR8kcXN/pub?output=csv'; // Paste your Google Sheets published CSV URL here
 
-    // Products array (will be loaded from Google Sheets)
+    // Products array (will be loaded from Google Sheets or Excel)
+    // Each product: { name, price, brand }
     let PRODUCTS = [];
 
     // DOM Elementsx
@@ -38,6 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewItemsBody = document.getElementById('previewItemsBody');
     const previewGrandTotal = document.getElementById('previewGrandTotal');
     const generatePdfBtn = document.getElementById('generatePdfBtn');
+    const invoiceDateEl = document.getElementById('invoiceDate');
+    const previewInvoiceDateEl = document.getElementById('previewInvoiceDate');
+    // Date preview flags declared early to avoid race if login is clicked before script finishes
+    let previewDateManual = false;
+    let lastInvoiceDateValue = invoiceDateEl ? invoiceDateEl.value : '';
 
     const autocompleteMenu = document.createElement('div');
     autocompleteMenu.className = 'autocomplete-menu';
@@ -46,6 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeAutocompleteIndex = -1;
     let activeAutocompleteItems = [];
     let autocompleteOpenTime = 0;
+    let _ac_touchStartY = 0;
+    let _ac_touchStartX = 0;
+    let _ac_touchMoved = false;
 
     // Input fields mapping
     const inputs = {
@@ -61,6 +70,18 @@ document.addEventListener('DOMContentLoaded', () => {
         invoiceNumber: 'previewInvoiceNumber',
         invoiceDate: 'previewInvoiceDate'
     };
+
+    // Elements for QR and Excel
+    const excelUpload = document.getElementById('excelUpload');
+    const qrToggle = document.getElementById('qrToggle');
+    const qrContainer = document.getElementById('qrContainer');
+    const bankDetailsPreview = document.getElementById('bankDetailsPreview');
+    const companyDetailsPreview = document.getElementById('companyDetailsPreview');
+    const qrImageUpload = document.getElementById('qrImageUpload');
+    const qrImageUrl = document.getElementById('qrImageUrl');
+    let qrImageDataUrl = null;
+    const previewQR = document.getElementById('previewQR');
+    const qrStaticLink = document.getElementById('qrStaticLink');
 
     // Function to load products from Google Sheets
     async function loadProductsFromGoogleSheets() {
@@ -82,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const csvText = await response.text();
             console.log('📄 CSV Data received:', csvText.substring(0, 100) + '...');
 
-            // Parse CSV
+            // Parse CSV (attempt to read header columns: name, price, brand)
             const lines = csvText.trim().split('\n');
             if (lines.length < 2) {
                 console.warn('⚠️ Google Sheet has no products');
@@ -90,23 +111,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Skip header row and parse products
+            const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const nameIdx = header.findIndex(h => /product|name|product name/.test(h));
+            const priceIdx = header.findIndex(h => /price/.test(h));
+            const brandIdx = header.findIndex(h => /brand/.test(h));
+
             const products = [];
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
-
-                // Simple split by comma
                 const parts = line.split(',');
-                if (parts.length < 2) continue;
-
-                const name = parts[0].trim();
-                const priceStr = parts[1].trim();
+                // Fallback: if header not recognized, use first two columns
+                const name = (nameIdx >= 0 ? (parts[nameIdx] || '') : (parts[0] || '')).trim();
+                const priceStr = (priceIdx >= 0 ? (parts[priceIdx] || '') : (parts[1] || '')).trim();
+                const brand = (brandIdx >= 0 ? (parts[brandIdx] || '') : '').trim();
                 const price = parseFloat(priceStr) || 0;
-
                 if (name) {
-                    products.push({ name, price });
-                    console.log(`  ✓ ${name}: ₹${price}`);
+                    products.push({ name, price, brand });
+                    console.log(`  ✓ ${name} (${brand}): ₹${price}`);
                 }
             }
 
@@ -139,29 +161,213 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load products from Google Sheets on page load
     loadProductsFromGoogleSheets();
 
+    // Excel import handling (SheetJS)
+    async function handleExcelFile(file) {
+        const statusEl = document.getElementById('excel-status');
+        try {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+            const products = [];
+            json.forEach(row => {
+                // Normalize keys
+                const keys = Object.keys(row);
+                let name = '';
+                let price = 0;
+                let brand = '';
+                keys.forEach(k => {
+                    const lk = k.trim().toLowerCase();
+                    if (/product|name|product name/.test(lk)) name = row[k];
+                    else if (/price/.test(lk)) price = parseFloat(row[k]) || 0;
+                    else if (/brand/.test(lk)) brand = row[k];
+                });
+                // Fallback to first two columns
+                if (!name && keys[0]) name = row[keys[0]];
+                if (!price && keys[1]) price = parseFloat(row[keys[1]]) || 0;
+                if (name) products.push({ name: String(name).trim(), price, brand: String(brand || '').trim() });
+            });
+
+            if (products.length) {
+                PRODUCTS.length = 0;
+                PRODUCTS.push(...products);
+                if (statusEl) statusEl.innerHTML = `✅ <span style="color:#22c55e">${products.length} products loaded from Excel</span>`;
+            } else {
+                if (statusEl) statusEl.textContent = '⚠️ No products found in Excel';
+            }
+        } catch (err) {
+            console.error('Excel parse error', err);
+            if (statusEl) statusEl.textContent = '❌ Error parsing Excel';
+        }
+    }
+
+    if (excelUpload) {
+        excelUpload.addEventListener('change', (e) => {
+            const f = e.target.files[0];
+            if (f) handleExcelFile(f);
+        });
+    }
+
+    // QR Code generation and controls
+    function getQRText() {
+        // Simplified: always generate QR from the Bank Details text (full block)
+        return bankDetailsPreview ? bankDetailsPreview.innerText.trim() : '';
+    }
+
+    function updateQRCode() {
+        if (!qrContainer) return;
+        // clear
+        qrContainer.innerHTML = '';
+        if (!qrToggle || !qrToggle.checked) {
+            try { qrContainer.style.display = 'none'; } catch (e) {}
+            if (qrStaticLink) qrStaticLink.style.display = 'none';
+            return;
+        }
+        try { qrContainer.style.display = 'flex'; } catch (e) {}
+        // If user provided an uploaded image use it
+        if (qrImageDataUrl) {
+            const img = document.createElement('img');
+            img.src = qrImageDataUrl;
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            qrContainer.appendChild(img);
+            if (qrStaticLink) qrStaticLink.style.display = 'none';
+            return;
+        }
+
+        // If user provided an image URL
+        const url = qrImageUrl ? qrImageUrl.value.trim() : '';
+        if (url) {
+            const img = document.createElement('img');
+            // Encode the URL so filenames with spaces (e.g. 'qr code.jpg') work
+            try {
+                const src = (url.indexOf('://') === -1) ? encodeURI(url) : url;
+                img.src = src;
+            } catch (e) {
+                img.src = url;
+            }
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.decoding = 'async';
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                // image loaded successfully
+            };
+            img.onerror = () => {
+                console.warn('QR image URL failed to load:', url);
+            };
+            qrContainer.appendChild(img);
+            if (qrStaticLink) qrStaticLink.style.display = 'none';
+            return;
+        }
+
+        // No upload or URL: try loading a local static file 'qr-code.jpg' and use it if available.
+        try {
+            const localSrc = 'qr-code.jpg';
+            const imgLocal = document.createElement('img');
+            imgLocal.style.maxWidth = '100%';
+            imgLocal.style.height = 'auto';
+            imgLocal.decoding = 'async';
+            imgLocal.crossOrigin = 'anonymous';
+
+            imgLocal.onload = () => {
+                // show the local image in the qr container
+                qrContainer.appendChild(imgLocal);
+                if (qrStaticLink) qrStaticLink.style.display = (qrToggle && qrToggle.checked) ? 'inline-block' : 'none';
+            };
+
+            imgLocal.onerror = () => {
+                // local image not available - hide static link and fall back to generated QR
+                if (qrStaticLink) qrStaticLink.style.display = 'none';
+                const text = getQRText();
+                if (!text) return;
+                try {
+                    new QRCode(qrContainer, {
+                        text: String(text),
+                        width: 140,
+                        height: 140,
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                } catch (err) {
+                    console.error('QR error', err);
+                }
+            };
+
+            // Start loading the local image (onload or onerror will handle the rest)
+            imgLocal.src = encodeURI(localSrc);
+            return; // wait for onload/onerror to populate qrContainer
+        } catch (err) {
+            console.warn('Local QR load failed', err);
+        }
+
+        // Fallback: generate QR from bank details text
+        const text = getQRText();
+        if (!text) return;
+        try {
+            new QRCode(qrContainer, {
+                text: String(text),
+                width: 140,
+                height: 140,
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        } catch (err) {
+            console.error('QR error', err);
+        }
+    }
+
+    if (qrToggle) qrToggle.addEventListener('change', updateQRCode);
+    if (bankDetailsPreview) bankDetailsPreview.addEventListener('input', updateQRCode);
+    if (qrImageUrl) qrImageUrl.addEventListener('input', () => { qrImageDataUrl = null; updateQRCode(); });
+    if (qrImageUpload) {
+        qrImageUpload.addEventListener('change', (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (!f) { qrImageDataUrl = null; updateQRCode(); return; }
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                qrImageDataUrl = ev.target.result;
+                // clear URL if any
+                if (qrImageUrl) qrImageUrl.value = '';
+                updateQRCode();
+            };
+            reader.readAsDataURL(f);
+        });
+    }
+    // initial
+    setTimeout(updateQRCode, 250);
+
+    // Static QR preview handling (show link only when toggle is ON and no upload/URL)
+    if (previewQR) {
+        previewQR.onload = () => {
+            if (qrStaticLink) qrStaticLink.style.display = (qrToggle && qrToggle.checked && !qrImageDataUrl && !(qrImageUrl && qrImageUrl.value.trim())) ? 'inline-block' : 'none';
+        };
+        previewQR.onerror = () => {
+            if (qrStaticLink) qrStaticLink.style.display = 'none';
+        };
+    }
+
     // Invoice Number Management
     function getNextInvoiceNumber() {
         if (!currentUser) return '001';
-        let currentNum = localStorage.getItem(`lastInvoiceNumber_${currentUser}`);
-        if (!currentNum) {
-            currentNum = 1;
-        } else {
-            currentNum = parseInt(currentNum, 10);
+        const key = `lastInvoiceNumberStr_${currentUser}`;
+        let stored = localStorage.getItem(key);
+        if (!stored) {
+            stored = '001';
+            localStorage.setItem(key, stored);
         }
-        return currentNum.toString().padStart(3, '0');
+        return String(stored);
     }
 
     function incrementInvoiceNumber() {
         if (!currentUser) return;
-        let currentNum = localStorage.getItem(`lastInvoiceNumber_${currentUser}`);
-        if (!currentNum) {
-            currentNum = 1;
-        } else {
-            currentNum = parseInt(currentNum, 10);
-        }
-        const nextNum = currentNum + 1;
-        localStorage.setItem(`lastInvoiceNumber_${currentUser}`, nextNum);
-        document.getElementById('invoiceNumber').value = nextNum.toString().padStart(3, '0');
+        const key = `lastInvoiceNumberStr_${currentUser}`;
+        let stored = localStorage.getItem(key) || '001';
+        const numeric = parseInt(stored, 10) || 0;
+        const next = numeric + 1;
+        const nextStr = String(next).padStart(3, '0');
+        localStorage.setItem(key, nextStr);
+        document.getElementById('invoiceNumber').value = nextStr;
         updatePreview();
     }
 
@@ -191,23 +397,41 @@ document.addEventListener('DOMContentLoaded', () => {
         appContainer.style.display = 'block';
     }
 
-    loginForm.addEventListener('submit', (e) => {
-        const userVal = document.getElementById('loginUsername').value.trim();
-        const passVal = document.getElementById('loginPassword').value.trim();
+    // Centralized login handler to be used for submit and button click
+    function handleLoginEvent(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        try {
+            const userVal = document.getElementById('loginUsername').value.trim();
+            const passVal = document.getElementById('loginPassword').value.trim();
 
-        if (USERS[userVal] && USERS[userVal].password === passVal) {
-            // Success! The form submits to the hidden_iframe natively (triggering Save Password),
-            // while we instantly update the UI manually here without a page reload.
-            localStorage.setItem('loggedInUser', userVal);
-            loginError.style.display = 'none';
-            initializeAppForUser(userVal);
-        } else {
-            // Only stop the form from submitting if the password was wrong
-            e.preventDefault();
-            loginError.textContent = "Invalid username or password";
+            console.log('Attempt login', { userVal });
+
+            // Match username case-insensitively
+            const matchedKey = Object.keys(USERS).find(k => k.toLowerCase() === userVal.toLowerCase());
+            if (matchedKey && USERS[matchedKey].password === passVal) {
+                localStorage.setItem('loggedInUser', matchedKey);
+                loginError.style.display = 'none';
+                initializeAppForUser(matchedKey);
+                return true;
+            }
+
+            loginError.textContent = "Invalid username or password. Check capitalization.";
             loginError.style.display = 'block';
+            return false;
+        } catch (err) {
+            console.error('Login handler error', err);
+            if (loginError) {
+                loginError.textContent = 'Login error. See console.';
+                loginError.style.display = 'block';
+            }
+            return false;
         }
-    });
+    }
+
+    // Attach for form submit and button click (cover both cases)
+    if (loginForm) loginForm.addEventListener('submit', handleLoginEvent);
+    const loginBtnEl = document.getElementById('loginBtn');
+    if (loginBtnEl) loginBtnEl.addEventListener('click', handleLoginEvent);
 
     logoutBtn.addEventListener('click', () => {
         localStorage.removeItem('loggedInUser');
@@ -226,8 +450,25 @@ document.addEventListener('DOMContentLoaded', () => {
         appContainer.style.display = 'none';
     }
 
-    // Initialize with today's date
-    document.getElementById('invoiceDate').valueAsDate = new Date();
+    // Initialize with today's date (ISO yyyy-mm-dd)
+    if (invoiceDateEl && !invoiceDateEl.value) {
+        invoiceDateEl.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Auto-update date when the system day changes, unless the user manually edited the preview date
+    setInterval(() => {
+        try {
+            if (typeof previewDateManual !== 'undefined' && previewDateManual) return;
+            const todayIso = new Date().toISOString().split('T')[0];
+            if (invoiceDateEl && invoiceDateEl.value !== todayIso) {
+                invoiceDateEl.value = todayIso;
+                lastInvoiceDateValue = todayIso;
+                updatePreview();
+            }
+        } catch (err) {
+            console.warn('Date auto-update failed', err);
+        }
+    }, 60 * 1000); // check every minute
 
     // Event Listeners for basic inputs
     Object.keys(inputs).forEach(inputId => {
@@ -236,6 +477,58 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('input', updatePreview);
         }
     });
+
+    // Date sync flags: if user edits preview date directly, don't overwrite it when invoice number changes
+
+    function toISODateStringFromText(text) {
+        if (!text) return null;
+        text = text.trim();
+        // Try dd/mm/yyyy
+        let m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (m) {
+            const dd = m[1].padStart(2, '0');
+            const mm = m[2].padStart(2, '0');
+            const yyyy = m[3];
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        // Try yyyy-mm-dd
+        m = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (m) {
+            const yyyy = m[1];
+            const mm = m[2].padStart(2, '0');
+            const dd = m[3].padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        // Fallback: try Date.parse
+        const parsed = Date.parse(text);
+        if (!Number.isNaN(parsed)) {
+            return new Date(parsed).toISOString().split('T')[0];
+        }
+        return null;
+    }
+
+    if (previewInvoiceDateEl) {
+        previewInvoiceDateEl.addEventListener('input', () => {
+            previewDateManual = true;
+        });
+        previewInvoiceDateEl.addEventListener('blur', () => {
+            const txt = previewInvoiceDateEl.textContent || '';
+            const iso = toISODateStringFromText(txt);
+            if (iso && invoiceDateEl) {
+                invoiceDateEl.value = iso;
+                lastInvoiceDateValue = iso;
+                previewDateManual = true; // user edited preview intentionally
+            }
+        });
+    }
+
+    if (invoiceDateEl) {
+        invoiceDateEl.addEventListener('change', () => {
+            previewDateManual = false; // user changed via date input, keep preview in sync
+            lastInvoiceDateValue = invoiceDateEl.value;
+            updatePreview();
+        });
+    }
 
     // Logo Upload
     const logoUpload = document.getElementById('logoUpload');
@@ -260,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add Item Button
     function addNewItem() {
-        items.push({ id: Date.now(), description: '', itemDetails: '', quantity: 1, price: 0 });
+        items.push({ id: Date.now(), brand: '', description: '', itemDetails: '', quantity: 1, price: 0 });
         renderItemsInput();
         renderItemsTable();
     }
@@ -300,9 +593,266 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Clone the element
             const clone = element.cloneNode(true);
+            // ==============================
+            // CLEAN PDF TABLE (NO DUPLICATE TOTAL)
+            // ==============================
+
+            // Remove any existing Grand Total rows completely
+            clone.querySelectorAll('tr').forEach(tr => {
+                if (tr.innerText.toUpperCase().includes('GRAND TOTAL')) {
+                    tr.remove();
+                }
+            });
+
+            const pdfTable = clone.querySelector('.invoice-table');
+
+            if (pdfTable) {
+
+                // Force fixed layout (important for width control)
+                pdfTable.style.tableLayout = 'fixed';
+                pdfTable.style.width = '100%';
+
+                try {
+                    // Prefer copying the live preview table rows so any user-entered values
+                    // (including description) are preserved exactly as seen in the preview.
+                    const liveTbody = document.getElementById('previewItemsBody');
+                    const tbody = pdfTable.querySelector('tbody');
+                    if (liveTbody && tbody) {
+                        // Build tbody from live rows, extracting current input values and contenteditable text
+                        tbody.innerHTML = '';
+                        const liveRows = Array.from(liveTbody.querySelectorAll('tr'));
+                        liveRows.forEach(lr => {
+                            const newRow = document.createElement('tr');
+                            Array.from(lr.children).forEach(origCell => {
+                                const newCell = document.createElement(origCell.tagName.toLowerCase());
+                                const colIndex = Array.from(lr.children).indexOf(origCell);
+                                // copy attributes (class, data-*) so styling and data-label remain
+                                Array.from(origCell.attributes).forEach(attr => {
+                                    try { newCell.setAttribute(attr.name, attr.value); } catch (e) {}
+                                });
+
+                                // Collect visible text from inputs, contenteditable, or plain text
+                                let cellText = '';
+                                // Inputs (may be multiple inside a cell)
+                                const inputs = Array.from(origCell.querySelectorAll('input'));
+                                if (inputs.length) {
+                                    cellText = inputs.map(i => (i.value != null && String(i.value).trim() !== '') ? String(i.value).trim() : (i.getAttribute('value') || '')).filter(Boolean).join(' ');
+                                }
+                                // If no input text, check for contenteditable children
+                                if (!cellText) {
+                                    const ce = origCell.querySelector('[contenteditable]');
+                                    if (ce && (ce.textContent || '').trim()) cellText = ce.textContent.trim();
+                                }
+                                // If still empty, take the visible text of the cell
+                                if (!cellText) cellText = (origCell.textContent || '').trim();
+
+                                // If product description cell is still empty, fall back to items[] using column position
+                                if (!cellText) {
+                                    // product/description is expected at colIndex 2 (0-based), but handle flexibly
+                                    if (!Number.isNaN(colIndex) && items && items.length) {
+                                        const rowIndex = liveRows.indexOf(lr);
+                                        const it = items[rowIndex];
+                                        if (it) {
+                                            if (colIndex === 2 && it.description) cellText = String(it.description).trim();
+                                            if (colIndex === 1 && it.brand) cellText = String(it.brand).trim();
+                                            if ((colIndex === 4 || colIndex === 5) && it.price != null) cellText = String(it.price);
+                                        }
+                                    }
+                                }
+
+                                // If this is the product column, prefer rendering product name above details
+                                if (colIndex === 2) {
+                                    const descInput = origCell.querySelector('input[data-field="description"]');
+                                    const detailsInput = origCell.querySelector('input[data-field="itemDetails"]');
+                                    const mainText = descInput ? (descInput.value != null && String(descInput.value).trim() !== '' ? String(descInput.value).trim() : (descInput.getAttribute('value') || '')) : '';
+                                    const detailsText = detailsInput ? (detailsInput.value != null && String(detailsInput.value).trim() !== '' ? String(detailsInput.value).trim() : (detailsInput.getAttribute('value') || '')) : '';
+                                    // If we have either main or details, build stacked HTML
+                                    const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                    if (mainText || detailsText) {
+                                        newCell.innerHTML = `<div class="pdf-cell-product"><div class="pdf-product-main">${escapeHtml(mainText)}</div>${detailsText ? `<div class="pdf-product-details">${escapeHtml(detailsText)}</div>` : ''}</div>`;
+                                    } else if (cellText) {
+                                        // If no inputs but cellText present, try to split by newline into main/details
+                                        const parts = cellText.split(/\n+/).map(p => p.trim()).filter(Boolean);
+                                        if (parts.length > 1) {
+                                            newCell.innerHTML = `<div class="pdf-cell-product"><div class="pdf-product-main">${escapeHtml(parts[0])}</div><div class="pdf-product-details">${escapeHtml(parts.slice(1).join(' '))}</div></div>`;
+                                        } else {
+                                            newCell.textContent = cellText;
+                                        }
+                                    } else {
+                                        newCell.textContent = cellText;
+                                    }
+                                } else {
+                                    newCell.textContent = cellText;
+                                }
+
+                                // Ensure TOTAL column (6th, colIndex === 5) content is centered in the PDF clone
+                                if (colIndex === 5) {
+                                    try {
+                                        const span = document.createElement('span');
+                                        span.className = 'pdf-total-amount';
+                                        span.textContent = (newCell.textContent || '').trim();
+                                        newCell.textContent = '';
+                                        newCell.appendChild(span);
+                                        newCell.style.setProperty('text-align', 'center', 'important');
+                                    } catch (e) { /* ignore */ }
+                                }
+
+                                newRow.appendChild(newCell);
+                            });
+                            tbody.appendChild(newRow);
+                        });
+
+                        // Compute grand total from items[] (numeric source)
+                        let computedGrand = 0;
+                        items.forEach(it => { computedGrand += (Number(it.quantity) || 0) * (Number(it.price) || 0); });
+                        const grandRow = document.createElement('tr');
+                        grandRow.innerHTML = `
+        <td colspan="4"></td>
+        <td style="text-align:center; font-weight:600; color:#1e40af;">
+            GRAND TOTAL
+        </td>
+        <td style="text-align:center; font-weight:600; color:#1e40af;">
+            ${formatCurrency(computedGrand)}
+        </td>
+    `;
+                        tbody.appendChild(grandRow);
+                    } else {
+                        // Fallback to building from `items` if live tbody isn't available
+                        const fallbackTbody = pdfTable.querySelector('tbody');
+                        fallbackTbody.innerHTML = '';
+                        let grandTotal = 0;
+                        items.forEach((item, index) => {
+                            const total = item.quantity * item.price;
+                            grandTotal += total;
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+            <td style="width:6%;">${index + 1}</td>
+
+            <td style="width:18%; text-align:center; white-space:nowrap; overflow:hidden;">
+                <span class="pdf-brand">${item.brand || ''}</span>
+            </td>
+
+            <td style="width:36%;">${item.description || ''}</td>
+
+            <td style="width:8%; text-align:center;">${item.quantity}</td>
+
+            <td style="width:16%; text-align:center;">${formatCurrency(item.price)}</td>
+
+            <td style="width:16%; text-align:right;">${formatCurrency(total)}</td>
+        `;
+                            fallbackTbody.appendChild(row);
+                        });
+                        const grandRow = document.createElement('tr');
+                        grandRow.innerHTML = `
+        <td colspan="4"></td>
+        <td style="text-align:center; font-weight:600; color:#1e40af;">
+            GRAND TOTAL
+        </td>
+        <td style="text-align:center; font-weight:600; color:#1e40af;">
+            ${formatCurrency(grandTotal)}
+        </td>
+    `;
+                        fallbackTbody.appendChild(grandRow);
+                    }
+                } catch (err) {
+                    console.warn('Error copying live tbody into PDF clone', err);
+                }
+            }
+
+
+
 
             // Apply PDF mode styling
             clone.classList.add('pdf-mode');
+
+            // Ensure the preview date in the cloned node is always a real date (prevents placeholder 'Click to edit')
+            try {
+                const clonePreviewDate = clone.querySelector('#previewInvoiceDate');
+                const mainInvoiceDate = document.getElementById('invoiceDate');
+                const sourceDate = (mainInvoiceDate && mainInvoiceDate.value) ? mainInvoiceDate.value : (new Date().toISOString().split('T')[0]);
+                let displayDate = '';
+                if (sourceDate) {
+                    const d = new Date(sourceDate);
+                    if (!Number.isNaN(d)) displayDate = d.toLocaleDateString('en-GB');
+                }
+                if (!displayDate) displayDate = new Date().toLocaleDateString('en-GB');
+                if (clonePreviewDate) clonePreviewDate.textContent = displayDate;
+            } catch (e) {
+                console.warn('Could not set clone preview date', e);
+            }
+
+            // Ensure table uses fixed layout and set explicit column widths so headers align with data in PDF
+            try {
+                const tbl = clone.querySelector('.invoice-table');
+                if (tbl) {
+                    tbl.style.tableLayout = 'fixed';
+                    // Preferred widths (percent) for columns: idx, brand, desc, qty, price, total, delete
+                    const colMap = {
+                        'col-idx': '6%',
+                        'col-brand': '12%',
+                        'col-desc': '48%',
+                        'col-qty': '8%',
+                        'col-price': '13%',
+                        'col-total': '13%',
+                        'col-delete': '0%'
+                    };
+                    const cols = tbl.querySelectorAll('col');
+                    cols.forEach(c => {
+                        const cls = c.className || '';
+                        if (colMap[cls]) c.style.width = colMap[cls];
+                    });
+                }
+            } catch (err) {
+                console.warn('Could not set PDF column widths', err);
+            }
+
+            // Inject PDF-specific CSS to ensure print rendering matches screen
+            try {
+                const styleEl = document.createElement('style');
+                styleEl.type = 'text/css';
+                styleEl.appendChild(document.createTextNode(`
+    /* ========================= */
+    /* PDF TABLE CENTER ALIGN   */
+    /* ========================= */
+
+    .pdf-mode .invoice-table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+        table-layout: fixed !important;
+    }
+
+    .pdf-mode .invoice-table th,
+    .pdf-mode .invoice-table td {
+        border: 1px solid #000 !important;
+        padding: 8px 10px !important;
+        text-align: center !important;
+        vertical-align: middle !important;
+        box-sizing: border-box !important;
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-size: 12px !important;
+    }
+
+    .pdf-mode .invoice-table thead th {
+        background: #f3f4f6 !important;
+        font-weight: 600 !important;
+        text-align: center !important;
+    }
+
+    /* Ensure GRAND TOTAL row also centered */
+    .pdf-mode .invoice-table tr:last-child td {
+        text-align: center !important;
+        font-weight: 600 !important;
+    }
+
+    /* Product cell stacked layout in PDF: product name + smaller details */
+    .pdf-mode .pdf-cell-product { display:block; }
+    .pdf-mode .pdf-product-main { font-weight: 600 !important; }
+    .pdf-mode .pdf-product-details { font-size: 11px !important; color: #444 !important; margin-top: 4px !important; }
+`));
+                clone.insertBefore(styleEl, clone.firstChild);
+            } catch (err) {
+                console.warn('Could not inject PDF styles', err);
+            }
 
             // Replace all inputs with spans containing their values
             clone.querySelectorAll('input').forEach(input => {
@@ -329,22 +879,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.removeAttribute('contenteditable');
             });
 
-            // Force alignment for Grand Total row to bypass mobile CSS overrides in PDF
-            const grandTotalLabel = clone.querySelector('.grand-total-row td:first-child');
-            if (grandTotalLabel) {
-                grandTotalLabel.style.setProperty('text-align', 'right', 'important');
-                grandTotalLabel.style.setProperty('padding-right', '15px', 'important');
-            }
+            // Ensure the Grand Total amount cell is centered in the PDF clone
+            try {
+                const cloneGrandAmount = clone.querySelector('#previewGrandTotal');
+                if (cloneGrandAmount) {
+                    cloneGrandAmount.style.setProperty('text-align', 'center', 'important');
+                    cloneGrandAmount.style.setProperty('vertical-align', 'middle', 'important');
+                    cloneGrandAmount.style.setProperty('padding-top', '8px', 'important');
+                    cloneGrandAmount.style.setProperty('padding-bottom', '8px', 'important');
+                }
+            } catch (e) { /* ignore */ }
 
             // Hide no-print elements
             clone.querySelectorAll('.no-print').forEach(el => {
                 el.style.display = 'none';
             });
 
-            // Hide delete buttons and action buttons
-            clone.querySelectorAll('.col-delete, .delete-row-btn, .table-actions').forEach(el => {
-                el.style.display = 'none';
-            });
+            // Remove any delete buttons or interactive controls inside the cloned invoice table
+            try {
+                // Remove table action container(s)
+                clone.querySelectorAll('.table-actions').forEach(el => el.remove());
+
+                // Remove delete columns/buttons specifically inside the invoice table
+                clone.querySelectorAll('.invoice-table button, .invoice-table .delete-row-btn, .invoice-table .delete-col, .invoice-table .col-delete').forEach(el => {
+                    if (el && el.parentNode) el.parentNode.removeChild(el);
+                });
+            } catch (e) { /* ignore */ }
 
             // Create temporary container in viewport with tiny opacity (ensures render)
             tempContainer = document.createElement('div');
@@ -420,10 +980,10 @@ document.addEventListener('DOMContentLoaded', () => {
         items.forEach((item, index) => {
             const row = document.createElement('div');
             row.className = 'item-row';
-
             row.innerHTML = `
                 <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-                    <input type="text" placeholder="Description" value="${item.description}" style="margin-bottom: 0;" oninput="updateItem(${index}, 'description', this.value)">
+                    <input type="text" placeholder="Brand Name" value="${item.brand || ''}" style="margin-bottom: 0;" oninput="updateItem(${index}, 'brand', this.value)">
+                    <input type="text" placeholder="Product Name" value="${item.description}" style="margin-bottom: 0;" oninput="updateItem(${index}, 'description', this.value)">
                     <input type="text" placeholder="Details (Optional)" value="${item.itemDetails || ''}" style="margin-bottom: 0; font-size: 12px; color: #666;" oninput="updateItem(${index}, 'itemDetails', this.value)">
                 </div>
                 <input type="text" placeholder="Unit (e.g. PCS, LTR)" value="${item.unit || ''}" style="width: 80px;" oninput="updateItem(${index}, 'unit', this.value)">
@@ -460,10 +1020,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Format Date
-        const dateVal = document.getElementById('invoiceDate').value;
-        if (dateVal) {
-            const d = new Date(dateVal);
-            document.getElementById('previewInvoiceDate').textContent = d.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+        const dateVal = invoiceDateEl ? invoiceDateEl.value : '';
+        if (typeof previewDateManual !== 'undefined' && previewDateManual) {
+            // If preview was manually edited, keep as-is unless date input changed since last sync
+            if (invoiceDateEl && invoiceDateEl.value && invoiceDateEl.value !== lastInvoiceDateValue) {
+                previewDateManual = false;
+                lastInvoiceDateValue = invoiceDateEl.value;
+                const d = new Date(invoiceDateEl.value);
+                if (!Number.isNaN(d) && previewInvoiceDateEl) previewInvoiceDateEl.textContent = d.toLocaleDateString('en-GB');
+            }
+        } else {
+            if (dateVal) {
+                const d = new Date(dateVal);
+                if (!Number.isNaN(d) && previewInvoiceDateEl) previewInvoiceDateEl.textContent = d.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+            }
         }
 
         renderItemsTable();
@@ -486,7 +1056,26 @@ document.addEventListener('DOMContentLoaded', () => {
     function filterProducts(query) {
         const normalized = query.trim().toLowerCase();
         if (!normalized) return PRODUCTS.slice(0, 8);
-        return PRODUCTS.filter(product => product.name.toLowerCase().includes(normalized)).slice(0, 8);
+        return PRODUCTS.filter(product => product.name.toLowerCase().includes(normalized)).slice(0, 50);
+    }
+
+    // Return unique brand names from PRODUCTS as objects { name }
+    function filterBrands(query) {
+        const normalized = (query || '').trim().toLowerCase();
+        const brands = [];
+        const seen = new Set();
+        for (const p of PRODUCTS) {
+            const b = (p.brand || '').trim();
+            if (!b) continue;
+            const key = b.toLowerCase();
+            if (seen.has(key)) continue;
+            if (!normalized || key.includes(normalized)) {
+                brands.push({ name: b });
+                seen.add(key);
+            }
+            if (brands.length >= 50) break;
+        }
+        return brands;
     }
 
     function closeAutocomplete() {
@@ -494,6 +1083,8 @@ document.addEventListener('DOMContentLoaded', () => {
         activeDescriptionInput = null;
         activeAutocompleteIndex = -1;
         activeAutocompleteItems = [];
+        // Re-enable text selection after closing autocomplete (fix mobile select/scroll)
+        try { document.body.style.userSelect = ''; document.body.style.overflow = ''; } catch (e) {}
     }
 
     function positionAutocomplete(input) {
@@ -508,6 +1099,9 @@ document.addEventListener('DOMContentLoaded', () => {
         positionAutocomplete(input);
         activeAutocompleteIndex = -1;
         autocompleteOpenTime = Date.now();
+
+        // Prevent accidental text selection while scrolling on mobile when autocomplete is open
+        try { document.body.style.userSelect = 'none'; document.body.style.overflow = 'hidden'; } catch (e) {}
 
         if (!products.length) {
             autocompleteMenu.innerHTML = '<div class="autocomplete-empty">No matches found</div>';
@@ -557,7 +1151,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="#">${index + 1}</td>
-                <td data-label="Description">
+                <td data-label="Brand">
+                    <input class="table-input" data-field="brand" data-index="${index}" value="${item.brand || ''}" placeholder="Brand Name" autocomplete="off" />
+                </td>
+                <td data-label="Product">
                     <div class="cell-stack">
                         <input class="table-input" data-field="description" data-index="${index}" value="${item.description}" placeholder="Product Name" autocomplete="off" />
                         <input class="table-input table-input-details" data-field="itemDetails" data-index="${index}" value="${item.itemDetails || ''}" placeholder="Details (Optional)" autocomplete="off" />
@@ -595,16 +1192,21 @@ document.addEventListener('DOMContentLoaded', () => {
             items[index].quantity = parseNumber(target.value);
         } else if (field === 'price') {
             items[index].price = parseNumber(target.value);
+        } else if (field === 'brand') {
+            items[index].brand = target.value;
         } else if (field === 'description') {
             items[index].description = target.value.trim();
             const match = findProductByName(items[index].description);
             if (match) {
                 items[index].price = match.price;
+                if (match.brand) items[index].brand = match.brand;
 
                 const row = target.closest('tr');
                 if (row) {
                     const priceInput = row.querySelector('input[data-field="price"]');
                     if (priceInput) priceInput.value = formatCurrency(match.price);
+                    const brandInput = row.querySelector('input[data-field="brand"]');
+                    if (brandInput && match.brand) brandInput.value = match.brand;
                 }
             }
 
@@ -629,18 +1231,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleDescriptionFocus(e) {
         const target = e.target;
-        if (!target.dataset || target.dataset.field !== 'description') return;
-        const matches = filterProducts(target.value || '');
-        openAutocomplete(target, matches);
+        if (!target.dataset) return;
+        if (target.dataset.field === 'description') {
+            const matches = filterProducts(target.value || '');
+            openAutocomplete(target, matches);
+        } else if (target.dataset.field === 'brand') {
+            const matches = filterBrands(target.value || '');
+            openAutocomplete(target, matches);
+        }
     }
 
     function handleDescriptionKeydown(e) {
         const target = e.target;
-
-        // Only handle keyboard navigation for description fields when autocomplete is open
-        if (!target.dataset || target.dataset.field !== 'description') return;
+        // Only handle keyboard navigation for description or brand fields when autocomplete is open
+        if (!target.dataset) return;
+        const field = target.dataset.field;
+        if (!(field === 'description' || field === 'brand')) return;
         if (!activeDescriptionInput || target !== activeDescriptionInput) return;
         if (autocompleteMenu.style.display !== 'block') return;
+
+        const index = parseInt(target.dataset.index, 10);
 
         if (e.key === 'ArrowDown') {
             if (!activeAutocompleteItems.length) return;
@@ -658,24 +1268,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
                 e.stopPropagation();
 
-                // Get the selected product and update the item
                 const selectedItem = activeAutocompleteItems[activeAutocompleteIndex];
                 const name = selectedItem.dataset.name;
-                const product = findProductByName(name);
 
-                if (product) {
-                    const index = parseInt(target.dataset.index, 10);
-                    if (!Number.isNaN(index) && items[index]) {
+                if (field === 'description') {
+                    const product = findProductByName(name);
+                    if (product && !Number.isNaN(index) && items[index]) {
                         items[index].description = product.name;
                         items[index].price = product.price;
-
+                        if (product.brand) items[index].brand = product.brand;
                         target.value = product.name;
                         const row = target.closest('tr');
                         if (row) {
                             const priceInput = row.querySelector('input[data-field="price"]');
                             if (priceInput) priceInput.value = formatCurrency(product.price);
+                            const brandInput = row.querySelector('input[data-field="brand"]');
+                            if (brandInput && product.brand) brandInput.value = product.brand;
                         }
-
+                        refreshTotals();
+                        closeAutocomplete();
+                    }
+                } else if (field === 'brand') {
+                    if (!Number.isNaN(index) && items[index]) {
+                        items[index].brand = name;
+                        target.value = name;
+                        const row = target.closest('tr');
+                        if (row) {
+                            const brandInput = row.querySelector('input[data-field="brand"]');
+                            if (brandInput) brandInput.value = name;
+                        }
                         refreshTotals();
                         closeAutocomplete();
                     }
@@ -688,35 +1309,80 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Handle both mouse and touch events for mobile support
-    function handleAutocompleteItemSelect(e) {
-        const item = e.target.closest('.autocomplete-item');
-        if (!item || !activeDescriptionInput) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const name = item.dataset.name;
-        const product = findProductByName(name);
-        if (!product) return;
-
+    function selectAutocompleteElement(itemEl) {
+        if (!itemEl || !activeDescriptionInput) return;
+        const name = itemEl.dataset.name;
+        const field = activeDescriptionInput.dataset.field;
         const index = parseInt(activeDescriptionInput.dataset.index, 10);
         if (Number.isNaN(index) || !items[index]) return;
 
-        items[index].description = product.name;
-        items[index].price = product.price;
+        if (field === 'description') {
+            const product = findProductByName(name);
+            if (!product) return;
+            items[index].description = product.name;
+            items[index].price = product.price;
+            if (product.brand) items[index].brand = product.brand;
 
-        activeDescriptionInput.value = product.name;
-        const row = activeDescriptionInput.closest('tr');
-        if (row) {
-            const priceInput = row.querySelector('input[data-field="price"]');
-            if (priceInput) priceInput.value = formatCurrency(product.price);
+            activeDescriptionInput.value = product.name;
+            const row = activeDescriptionInput.closest('tr');
+            if (row) {
+                const priceInput = row.querySelector('input[data-field="price"]');
+                if (priceInput) priceInput.value = formatCurrency(product.price);
+                const brandInput = row.querySelector('input[data-field="brand"]');
+                if (brandInput && product.brand) brandInput.value = product.brand;
+            }
+
+            refreshTotals();
+            closeAutocomplete();
+        } else if (field === 'brand') {
+            items[index].brand = name;
+            activeDescriptionInput.value = name;
+            const row = activeDescriptionInput.closest('tr');
+            if (row) {
+                const brandInput = row.querySelector('input[data-field="brand"]');
+                if (brandInput) brandInput.value = name;
+            }
+            refreshTotals();
+            closeAutocomplete();
         }
-
-        refreshTotals();
-        closeAutocomplete();
     }
 
-    autocompleteMenu.addEventListener('mousedown', handleAutocompleteItemSelect);
-    autocompleteMenu.addEventListener('touchstart', handleAutocompleteItemSelect);
+    // Mouse click selection
+    autocompleteMenu.addEventListener('click', (e) => {
+        const item = e.target.closest('.autocomplete-item');
+        if (!item) return;
+        e.preventDefault();
+        e.stopPropagation();
+        selectAutocompleteElement(item);
+    });
+
+    // Touch selection: only select on touchend if there was no significant movement (prevents selecting while scrolling)
+    autocompleteMenu.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length === 1) {
+            _ac_touchStartY = e.touches[0].clientY;
+            _ac_touchStartX = e.touches[0].clientX;
+            _ac_touchMoved = false;
+        }
+    }, { passive: true });
+
+    autocompleteMenu.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches.length === 1) {
+            const dy = Math.abs(e.touches[0].clientY - _ac_touchStartY);
+            const dx = Math.abs(e.touches[0].clientX - _ac_touchStartX);
+            if (dy > 8 || dx > 8) _ac_touchMoved = true;
+        }
+    }, { passive: true });
+
+    autocompleteMenu.addEventListener('touchend', (e) => {
+        if (_ac_touchMoved) return; // user was scrolling
+        const touch = (e.changedTouches && e.changedTouches[0]) || null;
+        const target = touch ? document.elementFromPoint(touch.clientX, touch.clientY) : e.target;
+        const item = target && target.closest ? target.closest('.autocomplete-item') : null;
+        if (!item) return;
+        e.preventDefault();
+        e.stopPropagation();
+        selectAutocompleteElement(item);
+    }, { passive: true });
 
     document.addEventListener('click', (e) => {
         if (autocompleteMenu.contains(e.target)) return;
