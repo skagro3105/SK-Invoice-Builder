@@ -142,7 +142,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // If the user already clicked the input and is waiting, immediately update the dropdown
                 if (activeDescriptionInput && autocompleteMenu.style.display === 'block') {
-                    const matches = filterProducts(activeDescriptionInput.value || '');
+                    const query = activeDescriptionInput.value || '';
+                    const field = activeDescriptionInput.dataset.field;
+                    let matches;
+                    if (field === 'brand') {
+                        matches = filterBrands(query);
+                    } else {
+                        matches = filterProducts(query);
+                    }
                     openAutocomplete(activeDescriptionInput, matches);
                 }
             } else {
@@ -194,6 +201,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 PRODUCTS.length = 0;
                 PRODUCTS.push(...products);
                 if (statusEl) statusEl.innerHTML = `✅ <span style="color:#22c55e">${products.length} products loaded from Excel</span>`;
+                // refresh autocomplete list if currently open
+                if (activeDescriptionInput && autocompleteMenu.style.display === 'block') {
+                    const query = activeDescriptionInput.value || '';
+                    const field = activeDescriptionInput.dataset.field;
+                    const matches = field === 'brand' ? filterBrands(query) : filterProducts(query);
+                    openAutocomplete(activeDescriptionInput, matches);
+                }
             } else {
                 if (statusEl) statusEl.textContent = '⚠️ No products found in Excel';
             }
@@ -1002,6 +1016,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             items[index][field] = value;
         }
+
+        // propagate cross-fields when editing the simpler input form
+        if (field === 'brand') {
+            const match = findProductByBrand(items[index].brand || '');
+            if (match) {
+                items[index].description = match.name;
+                items[index].price = match.price;
+            }
+        } else if (field === 'description') {
+            const match = findProductByName(items[index].description || '');
+            if (match) {
+                items[index].brand = match.brand;
+                items[index].price = match.price;
+            }
+        }
+
+        // reflect any changes in the input rows (re‑render may reset cursor but it's acceptable)
+        renderItemsInput();
         updatePreview();
     };
 
@@ -1051,6 +1083,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function findProductByName(name) {
         const normalized = name.trim().toLowerCase();
         return PRODUCTS.find(product => product.name.toLowerCase() === normalized);
+    }
+
+    // Return first product that matches a given brand (case‑insensitive).
+    function findProductByBrand(brand) {
+        const normalized = brand.trim().toLowerCase();
+        return PRODUCTS.find(product => (product.brand || '').toLowerCase() === normalized);
     }
 
     function filterProducts(query) {
@@ -1107,8 +1145,10 @@ document.addEventListener('DOMContentLoaded', () => {
             autocompleteMenu.innerHTML = '<div class="autocomplete-empty">No matches found</div>';
             activeAutocompleteItems = [];
         } else {
+            // always show the raw name (brand or product) in the list; the filtering functions
+            // already supply the correct set depending on the field type.
             autocompleteMenu.innerHTML = products
-                .map(product => `<div class="autocomplete-item" data-name="${product.name}">${product.name}</div>`)
+                .map(item => `<div class="autocomplete-item" data-name="${item.name}">${item.name}</div>`)
                 .join('');
             activeAutocompleteItems = Array.from(autocompleteMenu.querySelectorAll('.autocomplete-item'));
         }
@@ -1194,6 +1234,23 @@ document.addEventListener('DOMContentLoaded', () => {
             items[index].price = parseNumber(target.value);
         } else if (field === 'brand') {
             items[index].brand = target.value;
+            // show brand suggestions as the user types
+            const brandMatches = filterBrands(items[index].brand);
+            openAutocomplete(target, brandMatches);
+            // if we can resolve a product for this brand, fill description/price too
+            const brandMatch = findProductByBrand(items[index].brand);
+            if (brandMatch) {
+                items[index].description = brandMatch.name;
+                items[index].price = brandMatch.price;
+
+                const row = target.closest('tr');
+                if (row) {
+                    const descInput = row.querySelector('input[data-field="description"]');
+                    if (descInput) descInput.value = brandMatch.name;
+                    const priceInput = row.querySelector('input[data-field="price"]');
+                    if (priceInput) priceInput.value = formatCurrency(brandMatch.price);
+                }
+            }
         } else if (field === 'description') {
             items[index].description = target.value.trim();
             const match = findProductByName(items[index].description);
@@ -1291,11 +1348,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (field === 'brand') {
                     if (!Number.isNaN(index) && items[index]) {
                         items[index].brand = name;
+                        // try to fill from the first matching product for this brand
+                        const prod = findProductByBrand(name);
+                        if (prod) {
+                            items[index].description = prod.name;
+                            items[index].price = prod.price;
+                        }
                         target.value = name;
                         const row = target.closest('tr');
                         if (row) {
                             const brandInput = row.querySelector('input[data-field="brand"]');
                             if (brandInput) brandInput.value = name;
+                            if (prod) {
+                                const descInput = row.querySelector('input[data-field="description"]');
+                                if (descInput) descInput.value = prod.name;
+                                const priceInput = row.querySelector('input[data-field="price"]');
+                                if (priceInput) priceInput.value = formatCurrency(prod.price);
+                            }
                         }
                         refreshTotals();
                         closeAutocomplete();
@@ -1336,11 +1405,23 @@ document.addEventListener('DOMContentLoaded', () => {
             closeAutocomplete();
         } else if (field === 'brand') {
             items[index].brand = name;
+            // also update item details if we have a matching product
+            const prod = findProductByBrand(name);
+            if (prod) {
+                items[index].description = prod.name;
+                items[index].price = prod.price;
+            }
             activeDescriptionInput.value = name;
             const row = activeDescriptionInput.closest('tr');
             if (row) {
                 const brandInput = row.querySelector('input[data-field="brand"]');
                 if (brandInput) brandInput.value = name;
+                if (prod) {
+                    const descInput = row.querySelector('input[data-field="description"]');
+                    if (descInput) descInput.value = prod.name;
+                    const priceInput = row.querySelector('input[data-field="price"]');
+                    if (priceInput) priceInput.value = formatCurrency(prod.price);
+                }
             }
             refreshTotals();
             closeAutocomplete();
