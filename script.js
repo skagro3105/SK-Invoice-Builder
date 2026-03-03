@@ -842,7 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
         text-align: center !important;
         vertical-align: middle !important;
         box-sizing: border-box !important;
-        font-family: Arial, Helvetica, sans-serif !important;
+        font-family: 'DejaVu Sans', 'Noto Sans', sans-serif !important;
         font-size: 12px !important;
     }
 
@@ -1506,3 +1506,4 @@ document.addEventListener('DOMContentLoaded', () => {
     renderItemsInput();
     renderItemsTable();
 });
+
