@@ -1663,3 +1663,4 @@ button:hover {
     .invoice-preview:not(.pdf-mode) .invoice-table tfoot tr.gst-row { margin-bottom: 12px !important; }
     .invoice-preview:not(.pdf-mode) .invoice-table tfoot tr.grand-total-row { margin-top: 6px !important; }
 }
+
