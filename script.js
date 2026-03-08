@@ -32,6 +32,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // Each product: { name, price, brand }
     let PRODUCTS = [];
 
+    function normalizeHeader(header) {
+        return String(header || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+
+    function isBrandHeader(header) {
+        const h = normalizeHeader(header);
+        return /(^|\s)brand(\s*name)?(\s|$)/.test(h);
+    }
+
+    function isPriceHeader(header) {
+        const h = normalizeHeader(header);
+        return /(^|\s)(price|rate|mrp)(\s|$)/.test(h);
+    }
+
+    function isProductHeader(header) {
+        const h = normalizeHeader(header);
+        if (!h) return false;
+        if (isBrandHeader(h) || isPriceHeader(h)) return false;
+        return /(^|\s)(product|technical|item|description|name)(\s|$)/.test(h);
+    }
+
     // DOM Elementsx
     const itemsContainer = document.getElementById('items-container');
     const addItemBtn = document.getElementById('addItemBtn');
@@ -111,10 +132,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const header = lines[0].split(',').map(h => h.trim().toLowerCase());
-            const nameIdx = header.findIndex(h => /product|name|product name/.test(h));
-            const priceIdx = header.findIndex(h => /price/.test(h));
-            const brandIdx = header.findIndex(h => /brand/.test(h));
+            const header = lines[0].split(',').map(h => h.trim());
+            const brandIdx = header.findIndex(isBrandHeader);
+            const nameIdx = header.findIndex(isProductHeader);
+            const priceIdx = header.findIndex(isPriceHeader);
 
             const products = [];
             for (let i = 1; i < lines.length; i++) {
@@ -122,11 +143,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!line) continue;
                 const parts = line.split(',');
                 // Fallback: if header not recognized, use first two columns
-                const name = (nameIdx >= 0 ? (parts[nameIdx] || '') : (parts[0] || '')).trim();
+                let brand = (brandIdx >= 0 ? (parts[brandIdx] || '') : '').trim();
+                let name = (nameIdx >= 0 ? (parts[nameIdx] || '') : '').trim();
                 const priceStr = (priceIdx >= 0 ? (parts[priceIdx] || '') : (parts[1] || '')).trim();
-                const brand = (brandIdx >= 0 ? (parts[brandIdx] || '') : '').trim();
+                // Brand-only sheets should still work with brand autocomplete.
+                if (!brand && !name) {
+                    const fallback = (parts[0] || '').trim();
+                    brand = fallback;
+                    name = fallback;
+                } else if (!name && brand) {
+                    name = brand;
+                } else if (!brand && name) {
+                    brand = name;
+                }
                 const price = parseFloat(priceStr) || 0;
-                if (name) {
+                if (name || brand) {
                     products.push({ name, price, brand });
                     console.log(`  ✓ ${name} (${brand}): ₹${price}`);
                 }
@@ -186,15 +217,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 let price = 0;
                 let brand = '';
                 keys.forEach(k => {
-                    const lk = k.trim().toLowerCase();
-                    if (/product|name|product name/.test(lk)) name = row[k];
-                    else if (/price/.test(lk)) price = parseFloat(row[k]) || 0;
-                    else if (/brand/.test(lk)) brand = row[k];
+                    if (isBrandHeader(k)) {
+                        brand = row[k];
+                    } else if (isPriceHeader(k)) {
+                        price = parseFloat(row[k]) || 0;
+                    } else if (isProductHeader(k)) {
+                        name = row[k];
+                    }
                 });
-                // Fallback to first two columns
-                if (!name && keys[0]) name = row[keys[0]];
+                // Fallbacks so brand-only uploads remain searchable.
+                if (!name && !brand && keys[0]) {
+                    const fallback = row[keys[0]];
+                    name = fallback;
+                    brand = fallback;
+                } else if (!name && brand) {
+                    name = brand;
+                } else if (!brand && name) {
+                    brand = name;
+                }
                 if (!price && keys[1]) price = parseFloat(row[keys[1]]) || 0;
-                if (name) products.push({ name: String(name).trim(), price, brand: String(brand || '').trim() });
+                if (name || brand) {
+                    products.push({
+                        name: String(name || '').trim(),
+                        price,
+                        brand: String(brand || '').trim()
+                    });
+                }
             });
 
             if (products.length) {
@@ -1088,7 +1136,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Return first product that matches a given brand (case‑insensitive).
     function findProductByBrand(brand) {
         const normalized = brand.trim().toLowerCase();
-        return PRODUCTS.find(product => (product.brand || '').toLowerCase() === normalized);
+        return PRODUCTS.find(product => {
+            const pBrand = (product.brand || '').toLowerCase();
+            const pName = (product.name || '').toLowerCase();
+            return pBrand === normalized || pName === normalized;
+        });
     }
 
     function filterProducts(query) {
@@ -1103,7 +1155,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const brands = [];
         const seen = new Set();
         for (const p of PRODUCTS) {
-            const b = (p.brand || '').trim();
+            const b = ((p.brand || '').trim() || (p.name || '').trim());
             if (!b) continue;
             const key = b.toLowerCase();
             if (seen.has(key)) continue;
