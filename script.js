@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         Tirth: {
             password: "Tirth",
-            contact: "9998675227 | skagro3105@gmail.com"
+            contact: "9664675227 | skagro3105@gmail.com"
         }
     };
 
@@ -1558,4 +1558,5 @@ document.addEventListener('DOMContentLoaded', () => {
     renderItemsInput();
     renderItemsTable();
 });
+
 
