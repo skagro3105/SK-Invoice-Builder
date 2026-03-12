@@ -1050,7 +1050,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <input type="text" placeholder="Unit (e.g. PCS, LTR)" value="${item.unit || ''}" style="width: 80px;" oninput="updateItem(${index}, 'unit', this.value)">
                 <input type="number" placeholder="Qty" value="${item.quantity}" style="width: 60px;" oninput="updateItem(${index}, 'quantity', this.value)">
-                <input type="number" placeholder="Price" value="${item.price}" style="width: 80px;" oninput="updateItem(${index}, 'price', this.value)">
+                <div class="rupee-input">
+                    <span class="rupee-symbol">₹</span>
+                    <input type="number" placeholder="Price" value="${item.price}" style="width: 80px;" oninput="updateItem(${index}, 'price', this.value)" min="0" step="0.01">
+                </div>
                 <button type="button" class="remove-btn" onclick="removeItem(${index})">&times;</button>
             `;
             itemsContainer.appendChild(row);
