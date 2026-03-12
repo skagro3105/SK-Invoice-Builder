@@ -112,6 +112,39 @@ button:hover {
     margin-bottom: 0;
 }
 
+.rupee-input {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+    width: 90px;
+}
+.rupee-symbol {
+    font-size: 18px;
+    color: #1f4b99;
+    font-weight: bold;
+    padding-right: 4px;
+    user-select: none;
+    pointer-events: none;
+}
+.rupee-input input[type="number"] {
+    width: 80px;
+    padding-left: 0;
+    border-radius: 10px;
+}
+
+@media (max-width: 600px) {
+    .rupee-input {
+        width: 100%;
+    }
+    .rupee-input input[type="number"] {
+        width: 100%;
+    }
+    .rupee-symbol {
+        font-size: 16px;
+    }
+}
+
 .remove-btn {
     background-color: #dc3545;
     padding: 5px 10px;
